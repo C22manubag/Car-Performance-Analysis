@@ -14,6 +14,7 @@ model = LinearRegression().fit(X, y)
 st.title("🚗 Fuel Economy Predictor (MPG)")
 st.markdown("Predict car fuel economy using horsepower, weight, and engine displacement.")
 
+# Manual Prediction
 st.header("🔧 Predict MPG Manually")
 
 hp = st.number_input("Horsepower (hp)", min_value=50, max_value=400, value=110)
@@ -21,12 +22,15 @@ wt = st.number_input("Weight (wt in 1000 lbs)", min_value=1.0, max_value=6.0, va
 disp = st.number_input("Displacement (disp in cubic inches)", min_value=50.0, max_value=500.0, value=200.0)
 
 if st.button("Predict MPG"):
-    result = model.predict([[hp, wt, disp]])[0]
+    input_data = pd.DataFrame([[hp, wt, disp]], columns=["hp", "wt", "disp"])
+    result = model.predict(input_data)[0]
     st.success(f"Predicted MPG: {result:.2f}")
 
-# Upload your own CSV file
+# Batch Prediction
 st.header("📁 Batch Prediction from Your CSV")
 uploaded_file = st.file_uploader("Upload a CSV with columns: hp, wt, disp", type="csv")
+
+user_df = None
 
 if uploaded_file is not None:
     user_df = pd.read_csv(uploaded_file)
@@ -39,16 +43,47 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error: {e}")
 
-# Show plot of actual vs predicted from built-in mtcars dataset
-st.header("📊 Model Performance on mtcars Dataset")
+# Dynamic Plot Section
+st.header("📊 Model Performance")
 
-predicted = model.predict(X)
-comparison_df = pd.DataFrame({"Actual MPG": y, "Predicted MPG": predicted})
+if user_df is not None and "Predicted MPG" in user_df:
+    # Check if actual MPG is available in uploaded data
+    if "mpg" in user_df:
+        plot_df = pd.DataFrame({
+            "Actual MPG": user_df["mpg"],
+            "Predicted MPG": user_df["Predicted MPG"]
+        })
+        plot_title = "Actual vs Predicted MPG (from uploaded data)"
+    else:
+        plot_df = pd.DataFrame({
+            "Actual MPG": [None] * len(user_df),
+            "Predicted MPG": user_df["Predicted MPG"]
+        })
+        plot_title = "Predicted MPG (uploaded data, no actual MPG to compare)"
+else:
+    predicted = model.predict(X)
+    plot_df = pd.DataFrame({
+        "Actual MPG": y,
+        "Predicted MPG": predicted
+    })
+    plot_title = "Actual vs Predicted MPG (on mtcars dataset)"
 
+# Plot
 fig, ax = plt.subplots()
-ax.scatter(comparison_df["Actual MPG"], comparison_df["Predicted MPG"], color="blue")
-ax.plot([min(y), max(y)], [min(y), max(y)], color="red", linestyle="--")
-ax.set_xlabel("Actual MPG")
-ax.set_ylabel("Predicted MPG")
-ax.set_title("Actual vs Predicted MPG (on mtcars dataset)")
+
+if plot_df["Actual MPG"].isnull().any():
+    ax.plot(plot_df["Predicted MPG"], marker="o", label="Predicted MPG")
+    ax.set_ylabel("Predicted MPG")
+    ax.set_xlabel("Car Index")
+else:
+    ax.scatter(plot_df["Actual MPG"], plot_df["Predicted MPG"], color="blue", label="Predictions")
+    ax.plot([plot_df["Actual MPG"].min(), plot_df["Actual MPG"].max()],
+            [plot_df["Actual MPG"].min(), plot_df["Actual MPG"].max()],
+            color="red", linestyle="--", label="Ideal")
+
+    ax.set_xlabel("Actual MPG")
+    ax.set_ylabel("Predicted MPG")
+
+ax.set_title(plot_title)
+ax.legend()
 st.pyplot(fig)
